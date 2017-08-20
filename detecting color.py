@@ -3,7 +3,8 @@ import numpy as np
 from time import time
 import random
 import math
-#initializing font
+
+#initializing font for puttext
 font = cv2.FONT_HERSHEY_COMPLEX_SMALL
 #loading apple image and making its mask to overlay on the video feed
 apple = cv2.imread("Apple-Fruit-Download-PNG.png",-1)
@@ -35,30 +36,18 @@ def detect_red(hsv):
     maskred = cv2.erode(maskred, kernel_erode, iterations=1)
     maskred = cv2.morphologyEx(maskred,cv2.MORPH_CLOSE,kernel_close)
     return maskred
-#function for detecting blue color
-def detect_blue(hsv):
-    lower = np.array([110, 50, 50])
-    upper = np.array([130, 255, 255])
-    mask = cv2.inRange(hsv, lower, upper)
-    mask = cv2.erode(mask, kernel_erode, iterations=1)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close)
-    return mask
 
-
-def onSegment(p,q,r):
-    if (q[0] <= max(p[0], r[0]) and q[0] >= min(p[0], r[0]) and q[1] <= max(p[1], r[1]) and q[1] >= min(p[1], r[1])):
-        return True
-
-    return False
-
+#functions for detecting intersection of line segments.
 def orientation(p,q,r):
     val = int(((q[1] - p[1]) * (r[0] - q[0])) - ((q[0] - p[0]) * (r[1] - q[1])))
     if val == 0:
+        #linear
         return 0
     elif (val>0):
         #clockwise
         return 1
     else:
+        #anti-clockwise
         return 2
 
 def intersect(p,q,r,s):
@@ -68,18 +57,7 @@ def intersect(p,q,r,s):
     o4 = orientation(r, s, q)
     if(o1 != o2 and o3 != o4):
         return True
-    """if (o1 == 0 and onSegment(p, r, q)):
-        return True
 
-    if (o2 == 0 and onSegment(p, s, q)):
-        return True
-
-    if (o3 == 0 and onSegment(r, p, s)):
-        return True
-
-    if (o4 == 0 and onSegment(r, q, s)):
-        return True
-"""
     return False
 
 #initilizing time (used for increasing the length of snake per second)
@@ -97,10 +75,11 @@ list_len = []
 # generating random number for placement of apple image
 random_x = random.randint(10,550)
 random_y = random.randint(10,400)
+#used for checking intersections
 a,b,c,d = [],[],[],[]
+#main loop
 while 1:
     xr, yr, wr, hr = 0, 0, 0, 0
-    #xb, yb, wb, hb = 0, 0, 0, 0
     _,frame = video.read()
     frame = cv2.flip(frame,1)
     # initilizing the accepted points so that they are not at the top left corner
@@ -128,15 +107,13 @@ while 1:
     # finding distance between the last point and the current point
     dist = int(math.sqrt(pow((last_point_x - point_x), 2) + pow((last_point_y - point_y), 2)))
     if (point_x!=0 and point_y!=0 and dist>5):
+        #if the point is accepted it is added to points list and its length added to list_len
         list_len.append(dist)
         length += dist
         last_point_x = point_x
         last_point_y = point_y
         points.append([point_x, point_y])
-
-    #print(blank_img[point_y][point_x][2])
-    #if blank_img[point_y][point_x][2]==0:
-    #    blank_img[point_y][point_x] = [0,0,255]
+    #if length becomes greater then the expected length, removing points from the back to decrease length
     if (length>=snake_len):
         for i in range(len(list_len)):
             length -= list_len[0]
@@ -144,21 +121,21 @@ while 1:
             points.pop(0)
             if(length<=snake_len):
                 break
-
+    #initializing blank black image
     blank_img = np.zeros((480, 640, 3), np.uint8)
+    #drawing the lines between all the points
     for i,j in enumerate(points):
         if (i==0):
             continue
         cv2.line(blank_img, (points[i-1][0], points[i-1][1]), (j[0], j[1]), (0, 0, 255), 5)
-        #cv2.circle(blank_img, (points[i-1][0], points[i-1][1]), 2, (0, 0, 0), -1)
-    #cv2.circle(blank_img, (last_point_x, last_point_y), 2 , (255, 0, 0), -1)
+    cv2.circle(blank_img, (last_point_x, last_point_y), 5 , (10, 200, 150), -1)
+    #if snake eats apple increase score and find new position for apple
     if  (last_point_x>random_x and last_point_x<(random_x+40) and last_point_y>random_y and last_point_y<(random_y+40)):
         score +=1
         random_x = random.randint(10, 550)
         random_y = random.randint(10, 400)
-    #print(blank_img[last_point_y,last_point_x],"Break")
+    #adding blank image to captured frame
     frame = cv2.add(frame,blank_img)
-    #cv2.imshow("new mask",maskred)
     #adding apple image to frame
     roi = frame[random_y:random_y+40, random_x:random_x+40]
     img_bg = cv2.bitwise_and(roi, roi, mask=apple_mask_inv)
@@ -166,34 +143,22 @@ while 1:
     dst = cv2.add(img_bg, img_fg)
     frame[random_y:random_y + 40, random_x:random_x + 40] = dst
     cv2.putText(frame, str("Score - "+str(score)), (250, 450), font, 1, (0, 255, 0), 2, cv2.LINE_AA)
+    # checking for snake hitting itself
     if(len(points)>5):
+        # a and b are the head points of snake and c,d are all other points
         b = points[len(points)-2]
         a = points[len(points)-1]
         for i in range(len(points)-3):
             c = points[i]
             d = points[i+1]
             if(intersect(a,b,c,d) and len(c)!=0 and len(d)!=0):
-                print(intersect(a,b,c,d),a,b,c,d)
                 temp = 0
                 break
         if temp==0:
             break
 
-
-
     cv2.imshow("frame",frame)
-    #cv2.imshow("img",blank_img)
-    #blank_img_hsv = cv2.cvtColor(blank_img, cv2.COLOR_BGR2HSV)
-    #maskred_snake = detect_red(blank_img_hsv)
-    #maskblue_snake = detect_blue(blank_img_hsv)
-    #part_blue = np.argwhere(blank_img == (255, 0, 0))[:, 0:2]
-    #part_red = np.argwhere(blank_img == (0, 0, 255))[:, 0:2]
-    """if(maskblue_snake in maskred_snake and last_point_y!=0 and last_point_x!=0):
-        print(last_point_x,last_point_y)
-        print("game over")
-        break
-    cv2.imshow("red",maskred_snake)
-    cv2.imshow("blue",maskblue_snake)"""
+    # increasing the length of snake 40px per second
     if((int(time())-start_time)>1):
         snake_len += 40
         start_time = int(time())
@@ -204,6 +169,7 @@ while 1:
 video.release()
 cv2.destroyAllWindows()
 cv2.putText(frame, str("Game Over!"), (100, 230), font, 3, (255, 0, 0), 3, cv2.LINE_AA)
+cv2.putText(frame, str("Press any key to Exit."), (180, 260), font, 1, (255, 200, 0), 2, cv2.LINE_AA)
 cv2.imshow("frame",frame)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
