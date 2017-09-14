@@ -81,6 +81,7 @@ a,b,c,d = [],[],[],[]
 while 1:
     xr, yr, wr, hr = 0, 0, 0, 0
     _,frame = video.read()
+    #fliping the frame horizontally.
     frame = cv2.flip(frame,1)
     # initilizing the accepted points so that they are not at the top left corner
     if(q==0 and point_x!=0 and point_y!=0):
